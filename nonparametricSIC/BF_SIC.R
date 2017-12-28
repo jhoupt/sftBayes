@@ -126,107 +126,154 @@ sicGroupBF <- function(inData, sictest="bf", domtest="ks", plotSIC=TRUE, ...) {
 }
 
 
-#bfSIC <- function(inData) {
-#  subjvec <- sort(unique(inData$Subject))
-#  condvec <- sort(unique(inData$Condition))
-#  BFnames <- c("SerialOR", "ParallelAND", "ParallelOR", "Coactive",
-#                "ParallelAND", "SerialAND")
-#  n <- 0
-#  BF <- matrix(NA, length(subjvec)*length(condvec),6)
-#  BFwin <- rep(NA, length(subjvec)*length(condvec))
-#  
-#  dat <- new.env()
-#  for (cond in condvec) {
-#    for (subj in subjvec) {
-#      n <- n+1
-#      dat$HH <- inData$RT[inData$Subject==subj & inData$Condition==cond &
-#                          inData$Correct & 
-#                          inData$Channel1==2 & inData$Channel2==2]
-#      dat$HL <- inData$RT[inData$Subject==subj & inData$Condition==cond &
-#                          inData$Correct & 
-#                          inData$Channel1==2 & inData$Channel2==1]
-#      dat$LH <- inData$RT[inData$Subject==subj & inData$Condition==cond &
-#                          inData$Correct & 
-#                          inData$Channel1==1 & inData$Channel2==2]
-#      dat$LL <- inData$RT[inData$Subject==subj & inData$Condition==cond &
-#                          inData$Correct & 
-#                          inData$Channel1==1 & inData$Channel2==1]
-#      dat <- as.list(dat)
-#      if ( min(c(lapply(dat, length), recursive=T)) > 10 ) {
-#        BF[n,] <- BFsic(dat,maxn=2e4,priorinfluence=1,verbose=FALSE,
-#                        tolSIC=.1,tolMIC=.3,fasttest2=T)$BF
-#        BFwin[n] <- BFnames[BF[n,] == max(BF[n,])]
-#      } else { BF[n,] == NA; BFwin[n] == NA }
-#
-#    }
-#  }
-#  return(list(BF=BF, BFwin=BFwin))
-#}
 
+sictestBayes <- function(HH, HL, LH, LL, method=c("DP", "IG"), model=NULL) { 
+  DNAME <- paste("\nHH:", deparse(substitute(HH)), "\tHL:", deparse(substitute(HL)), 
+                 "\nLH:", deparse(substitute(LH)), "\tLL:", deparse(substitute(LL)) )
+  if ( method == "DP") { 
+    METHOD <- "Nonparametric Bayesian SIC test"
+    statistic <- sicDPtest(list(HH, HL, LH, LL))$BF
+    statistic <- statistic[c(1,6,3,2,4)]
+    names(statistic) <- c("Zero", "NegPos.MIC0", "Positive", "Negative", "NegPos.MICpos")
 
+  } else if ( method == "IG") { 
+    METHOD <- "Parametric Bayesian SIC test"
 
+    dat <- list(NHH=length(HH), NHL=length(HL), NLH=length(LH), NLL=length(LL), 
+                yHH=HH, yHL=HL, yLH=LH, yLL=LL)
+    if (is.null(model)) { 
+      coactive.model <- stan_model(file="coactive_waic.stan")
+      paralleland.model <- stan_model(file="parallel-and_waic.stan")
+      parallelor.model <- stan_model(file="parallel-or_waic.stan")
+      serialand.model <- stan_model(file="serial-and_waic.stan")
+      serialor.model <- stan_model(file="serial-or_waic.stan")
+    }
+    coactive.posterior <- sampling(fit=coactive.model, data=dat, chains=3, iter=80000, warmup=8000)
+    coactive.posterior <- extract(coactive.posterior, c("summandsHH", "summandsHL", "summandsLH", "summandsLL"), permute=TRUE)
+    coactive.posterior <- cbind(coactive.posterior$summandsHH, coactive.posterior$summandsHL, coactive.posterior$summandsLH, coactive.posterior$summandsLL)
+    coactive.waic <- waic(coactive.posterior)$waic
+    rm(coactive.posterior)
 
-BFsic=function(dat,                                      
-               maxnbins=100,
-               nbin=min(unlist(lapply(dat,length)))-1,
-               bins=NULL,
-               nsamp1=1e4,nsamp=1e4,
-               priorinfluence=1,alpha=NULL,
-               prec=.01,ci=.95,
-               allconverge=F,
-               fasttest=F,sig=.95,
-               fasttest2=F,
-               maxn=5e5,
-               tolSIC=2e-3,
-               tolMIC=1e0,
-               verbose=F) {
-  # get histograms
-  if (is.null(bins)) {
-    if ( !is.na(maxnbins) ) nbin=min(maxnbins,nbin)
-    pvec <- c(0, (1:(nbin-1))/nbin, 1)
-    allData <- unlist(dat)
-    bins= quantile(allData, pvec)
-    bins[1] <- 0; bins[length(bins)] <- max(allData)+1
-    names(bins) <- NULL
+    paralleland.posterior <- sampling(paralleland.model, data=dat, chains=3, iter=80000, warmup=8000)
+    paralleland.posterior <- extract(paralleland.posterior, c("summandsHH", "summandsHL", "summandsLH", "summandsLL"), permute=TRUE)
+    paralleland.posterior <- cbind(paralleland.posterior$summandsHH, paralleland.posterior$summandsHL, paralleland.posterior$summandsLH, paralleland.posterior$summandsLL)
+    paralleland.waic <- waic(paralleland.posterior)$waic
+    rm(paralleland.posterior)
+
+    parallelor.posterior <- sampling(parallelor.model, data=dat, chains=3, iter=80000, warmup=8000)
+    parallelor.posterior <- extract(parallelor.posterior, c("summandsHH", "summandsHL", "summandsLH", "summandsLL"), permute=TRUE)
+    parallelor.posterior <- cbind(parallelor.posterior$summandsHH, parallelor.posterior$summandsHL, parallelor.posterior$summandsLH, parallelor.posterior$summandsLL)
+    parallelor.waic <- waic(parallelor.posterior)$waic
+    rm(parallelor.posterior)
+
+    serialand.posterior <- sampling(serialand.model, data=dat, chains=3, iter=80000, warmup=8000)
+    serialand.posterior <- extract(serialand.posterior, c("summandsHH", "summandsHL", "summandsLH", "summandsLL"), permute=TRUE)
+    serialand.posterior <- cbind(serialand.posterior$summandsHH, serialand.posterior$summandsHL, serialand.posterior$summandsLH, serialand.posterior$summandsLL)
+    serialand.waic <- waic(serialand.posterior)$waic
+    rm(serialand.posterior)
+
+    serialor.posterior <- sampling(serialor.model, data=dat, chains=3, iter=80000, warmup=8000)
+    serialor.posterior <- extract(serialor.posterior, c("summandsHH", "summandsHL", "summandsLH", "summandsLL"), permute=TRUE)
+    serialor.posterior <- cbind(serialor.posterior$summandsHH, serialor.posterior$summandsHL, serialor.posterior$summandsLH, serialor.posterior$summandsLL)
+    serialor.waic <- waic(serialor.posterior)$waic
+    rm(serialor.posterior)
+
+    statistic <- c(serialor.waic, serialand.waic, parallelor.waic, paralleland.waic, coactive.waic)
+    names(statistic) <- c("SerialOR", "SerialAND", "ParallelOR", "ParallelAND", "Coactive")
   }
+  rn <- list(statistic=statistic, method=METHOD, data.name=DNAME)
+  return(rn)
+}
 
-  #dx=diff(bins[-c(1,length(bins))]) # bin widths
-  dx = diff(bins)
-  binn <- sapply(dat, tabnodrop, bins=bins)
+
+# Little function to calculate posterior variances from simulation
+colVars <- function (a){
+  diff <- a - matrix (colMeans(a), nrow(a), ncol(a), byrow=TRUE)
+  vars <- colMeans (diff^2)*nrow(a)/(nrow(a)-1)
+  return (vars)
+}
+
+# The calculation of Waic!  Returns lppd, p_waic_1, p_waic_2, and waic, which we define
+# as 2*(lppd - p_waic_2), as recommmended in BDA
+waic <- function (log_lik){
+  lppd <- sum (log (colMeans(exp(log_lik))))
+  p_waic_1 <- 2*sum (log(colMeans(exp(log_lik))) - colMeans(log_lik))
+  p_waic_2 <- sum (colVars(log_lik))
+  waic_2 <- -2*lppd + 2*p_waic_2
+  return (list (waic=waic_2, p_waic=p_waic_2, lppd=lppd, p_waic_1=p_waic_1))
+}
 
 
-  # get dirichlet samples
-  if (is.null(alpha)) alpha=rep(priorinfluence/nbin,nbin)
-  alphaenc=rep(priorinfluence/nbin,nbin)
-  Nprs=rep(0,6); 
-  names(Nprs)=c("Z","N","P","nP","Np","np")
-  Npos=Nprs; 
-  NencPrs=Nprs; 
-  N=0; 
-  ns=nsamp1
+
+sicDPtest <- function(dat) { 
+  RTall <- unlist(dat)
+   
+  nbin <- min(100, min(unlist(lapply(dat,length)))-1)
+  nsamp <- 1e4
+
+  prec<-.01
+  ci<-.95
+  allconverge<-F
+  fasttest<-F
+  sig<-.95
+  fasttest2<-F
+  maxn<-5e5
+  tolSIC<-2e-3
+  tolMIC<-1e0
+  verbose<-F
+
+  # Define Bins
+  pvec <- c(0, (1:(nbin-1))/nbin, 1)
+  bins<- quantile(RTall, pvec)
+  bins[1] <- 0 
+  bins[length(bins)] <- max(RTall)+1
+  names(bins) <- NULL
+
+  # Calculate Bin Widths
+  dx <- diff(bins)
+
+  binn <- sapply(dat, tabnodrop, bins<-bins)
+
+  # Set prior measure for Dirichlet
+  alpha <- rep(1/nbin,nbin)
+
+  # Variable to track number of samples of each type
+  Nprs <- rep(0,6); 
+  names(Nprs) <- c("Z","N","P","nP","Np","np")
+  Npos <- Nprs; 
+  NencPrs <- Nprs; 
+
+  N <- 0; 
 
   repeat {
 
-    priorp <- samplePriorPDF(ns, alpha)
-    postp <- samplePostPDF(ns, binn, alpha)
+    # Sample PDF from the prior and posterior
+    priorp <- samplePriorPDF(nsamp, alpha)
+    postp <- samplePostPDF(nsamp, binn, alpha)
 
-    priorSIC=apply(priorp,1,pdfs2SIC)
-    postSIC=apply(postp,1,pdfs2SIC)
+    # Convert sample PDFs to sample SICs
+    priorSIC <- apply(priorp,1,pdfs2SIC)
+    postSIC  <- apply(postp,1,pdfs2SIC)
 
-    Npr=apply(apply(priorSIC,2,checkmods,dx=dx,tolSIC=tolSIC,tolMIC=tolMIC),1,sum)
-    Npo=apply(apply(postSIC,2,checkmods,dx=dx,tolSIC=tolSIC,tolMIC=tolMIC),1,sum)
-    Npos=Npos+Npo; Nprs=Nprs+Npr; N=N+ns
+    # Count number of SIC types in prior and posterior
+    Npr <- apply(apply(priorSIC,2,checkmods,dx=dx,tolSIC=tolSIC,tolMIC=tolMIC),1,sum)
+    Npo <- apply(apply(postSIC,2,checkmods,dx=dx,tolSIC=tolSIC,tolMIC=tolMIC),1,sum)
+    Npos <- Npos+Npo; 
+    Nprs <- Nprs+Npr
 
-    # get dirichlet samples from encompassing prior
-    encPrior <- array(as.vector(rdirichlet(4*ns,alphaenc)),dim=c(ns,4,length(alphaenc)))
+    N <- N+nsamp
+
+    # Samples from encompassing prior
+    encPrior <- array(as.vector(rdirichlet(4*nsamp,alpha)),dim=c(nsamp,4,length(alpha)))
     encPriorSIC <- apply(encPrior,1,pdfs2SIC)
     NencPr <- apply(apply(encPriorSIC,2,checkmods,dx=dx,tolSIC=tolSIC,tolMIC=tolMIC),1,sum)
     NencPrs <- NencPrs + NencPr
 
-    BF=(Npos+1)/(NencPrs+1)
-    CIs=cis(ci,Npos,NencPrs,N)
+    # Bayes factor relative to the encompassing prior
+    BF <- (Npos+1)/(NencPrs+1)
+    CIs <- cis(ci,Npos,NencPrs,N)
 
-    dcis=apply(CIs,1,diff)
+    dcis <- apply(CIs,1,diff)
 
     if (fasttest) {
       BFp=BF/sum(BF)
@@ -244,20 +291,15 @@ BFsic=function(dat,
 
     nmat=rbind(Nprs,Npos); dimnames(nmat)=list(c("Prior","Posterior"),names(Nprs))
     pmat=cbind(CIs[,1],BF/sum(BF),CIs[,2]); dimnames(pmat)[[2]]=c("Lo","BFp","Hi")
-    if (verbose) {
-      print(N) 
-      print(nmat)
-      print(round(t(pmat),3))
-    }
+
     if (converge | N>=maxn) break
-    ns=nsamp
   }
   list(BF=BF,BFp=pmat,N=nmat,ci=ci)
 }
 
 
-rdirichlet=function (n, alpha) {
-# modified from MCMCpack to never return a zero (sets zeros min double = 3e-324)
+rdirichlet <- function (n, alpha) {
+   # modified from MCMCpack to never return a zero (sets zeros min double = 3e-324)
     l <- length(alpha)
     x <- matrix(rgamma(l * n, alpha), ncol = l, byrow = TRUE)
     sm <- x %*% rep(1, l)
@@ -266,7 +308,7 @@ rdirichlet=function (n, alpha) {
     return(out)
 }
 
-tabnodrop=function(samp,bins) {
+tabnodrop <- function(samp,bins) {
     # Function to count the number of observations in each bin
     #  samp         Sample data to be binned
     #  bins         Bins into which sample data are divided
@@ -291,35 +333,56 @@ checkmods <- function(x,dx,tolSIC=5e-2,tolMIC=1e-2) {
 # checks several ordinal conditions 
 # returns boolean vector with element (i)=T if model true 
 
+  # "Z" "N" "P" "nP" "Np" "np"
+
+  #  Check for all negative regardless of tolerance
   if (all(x <= 0) & any(x < 0) ) return(c(FALSE,TRUE,FALSE,FALSE,FALSE,FALSE))
+
+  #  Check for all positive  regardless of tolerance
   if (all(x >= 0) & any(x > 0) ) return(c(FALSE,FALSE,TRUE,FALSE,FALSE,FALSE))
 
-  if (all(abs(x)< tolSIC) ) out=c(TRUE,FALSE,FALSE,FALSE,FALSE,FALSE) else {
-    nonzero <- (abs(x) > tolSIC)
-    #x=x[nonzero] 
-    #dx=dx[nonzero]
-    #neg = x < 0
-    neg = x < -tolSIC
-    pos = x > tolSIC
-    # Check if the SIC is all negative
-    if ( all(neg | !nonzero ) & any(neg) ) out=c(FALSE,TRUE,FALSE,FALSE,FALSE,FALSE) else {
-      # Check if the SIC is all positive 
-      if ( all(!neg) ) out=c(FALSE,FALSE,TRUE,FALSE,FALSE,FALSE) else {
-        # Check if the SIC starts positive
-        if ( (x[nonzero])[1]> 0 ) out=c(FALSE,FALSE,FALSE,FALSE,FALSE,FALSE) else {
-          d=neg[-length(neg)]!=neg[-1] # Determine the sign changes
-          if (sum(d)==1) {
-            sumN=-sum(x[neg]*dx[neg]); sumP=sum(x[!neg]*dx[!neg])
-            # Check if the MIC is zero
-            if(abs(sumN-sumP)<tolMIC) { 
-                out=c(FALSE,FALSE,FALSE,FALSE,FALSE,TRUE)
-            } else out=c(FALSE,FALSE,FALSE,sumN<sumP,sumN>sumP,FALSE)
-          } else out=c(FALSE,FALSE,FALSE,FALSE,FALSE,FALSE)
-        }  
-      }  
-    }
-  }
-  out
+  #  Check for all zero within tolerance
+  if (all(abs(x)< tolSIC) ) return(c(TRUE,FALSE,FALSE,FALSE,FALSE,FALSE))
+
+  #  Indicators of times for which the SIC is nonzero
+  nonzero <- (abs(x) > tolSIC)
+
+  #  Indicators of times for which the SIC is negative
+  neg = x < -tolSIC
+
+  #  Indicators of times for which the SIC is positive
+  pos = x > tolSIC
+
+  # Check if the SIC is all negative
+  if ( all(neg | !nonzero )  ) return( c(FALSE,TRUE,FALSE,FALSE,FALSE,FALSE) )
+
+  # Check if the SIC is all positive 
+  if ( all(!neg) )  return( c(FALSE,FALSE,TRUE,FALSE,FALSE,FALSE) )
+
+  # Check if the SIC starts positive, if so it does not fit one of the classes
+  if ( (x[nonzero])[1]> 0 ) return( c(FALSE,FALSE,FALSE,FALSE,FALSE,FALSE) )
+
+  # Determine the sign changes
+  d=neg[-length(neg)]!=neg[-1] 
+
+  # Check if there is more than one sign change, if so it does not fit one of the classes
+  if (sum(d)>1) return( c(FALSE,FALSE,FALSE,FALSE,FALSE,FALSE) )
+
+  # Calculate MIC
+  sumN <- -sum(x[neg]*dx[neg])
+  sumP <- sum(x[!neg]*dx[!neg])
+
+  # Check if the MIC is zero
+  if(abs(sumN-sumP)<tolMIC) return( c(FALSE,FALSE,FALSE,FALSE,FALSE,TRUE) )
+
+  # Check if MIC is positive
+  if(sumN < sumP) return( c(FALSE,FALSE,FALSE,TRUE,FALSE,FALSE) )
+   
+  # Check if MIC is negative 
+  if(sumN < sumP) return( c(FALSE,FALSE,FALSE,FALSE,TRUE,FALSE) )
+   
+  # Shouldn't reach here, but in case it does, it does not fit one of the classes
+  return( c(FALSE,FALSE,FALSE,FALSE,FALSE,FALSE) )
 }
 
 
@@ -339,155 +402,6 @@ cis=function(ci,npo,npr,N) {
 
 calcci=function(ci,n,N) {
   c(qbeta((1-ci)/2,n+1,N-n+1),qbeta(1-(1-ci)/2,n+1,N-n+1))
-}
-
-
-randDFP <- function(nbins) {
-#  Randomly samples channel completion times under the assumption
-#   that low RTs dominate high RTs
-
-    # Only use half of the bins so that at most all bins are possible 
-    #  samples for the low channel completion times
-    nH <- ceiling(nbins/2)
-
-    # Sample high channel completion times from a Dirichlet process
-    H1 <- rdirichlet(1, rep(1/nH,nH))
-    H2 <- rdirichlet(1, rep(1/nH,nH))
-
-    # Sample low channel completion times by convolving high channel times
-    #  with a random variable with a density sampled from a Dirichlet process
-    L1 <- c(dconvolve(rdirichlet(1, rep(2/(nbins-nH),nbins-nH)), H1), 0)
-    L2 <- c(dconvolve(rdirichlet(1, rep(2/(nbins-nH),nbins-nH)), H2), 0)
-
-    # Pad the High channel bins with zero they are defined over the same 
-    #  lengt vector as the low channel
-    H1 <- c(H1, rep(0,nbins/2))
-    H2 <- c(H2, rep(0,nbins/2))
-
-    return(list(H1=H1, H2=H2, L1=L1, L2=L2))
-}
-
-
-
-samplePriorSIC <- function(ns, bins, priorsic) {
-# Samples distributions for HH, HL, LH, LL based on the prior distribution over SICs
-#  ns:      number of samples to generate
-#  bins:    bins over which the distributions are defined
-
-    nbins <- length(bins)-1
-    if (sum(priorsic) > 1) {
-        warning("Sum of prior density over SICs is larger than 1.\n")
-    }
-    priorsic <- cumsum(priorsic)
-
-    priorlist <- vector("list",4)
-    priorarray <- array(NA, dim=c(ns, 4, nbins))
-
-    for ( i in 1:ns ) {
-        model <- runif(1)
-        if (model > 10) { 
-            # Wiener Coactive Model
-            cbins <- bins[1:(nbins-1)] + diff(bins)/2
-            cbins <- cbins[1:(nbins-1)]
-            rates <- sort(runif(3,min=1e-5,max=.3), decreasing=T)
-            while(thresh > 0 ) {thresh <- rnorm(1, mean=44, sd=15)}
-            rates <- c(rates, rates[2] + rates[3] - rates[1])
-            priorarray[i,1,] <- ns*c(dinvGauss(cbins, nu=thresh/rates[[1]], lambda=thresh^2/4), 
-                            ns*  1-pinvGauss(bins[length(bins)-1],nu=thresh/rates[[1]], lambda=thresh^2/4) )
-            priorarray[i,2,] <- ns*c(dinvGauss(cbins, nu=thresh/rates[[2]], lambda=thresh^2/4), 
-                            ns*  1-pinvGauss(bins[length(bins)-1],nu=thresh/rates[[2]], lambda=thresh^2/4) )
-            priorarray[i,3,] <- ns*c(dinvGauss(cbins, nu=thresh/rates[[3]], lambda=thresh^2/4), 
-                            ns*  1-pinvGauss(bins[length(bins)-1],nu=thresh/rates[[3]], lambda=thresh^2/4) )
-            priorarray[i,4,] <- ns*c(dinvGauss(cbins, nu=thresh/rates[[4]], lambda=thresh^2/4), 
-                                1-pinvGauss(bins[length(bins)-1],nu=thresh/rates[[4]], lambda=thresh^2/4) )
-        }
-        else {
-            # Sample chanel completion times
-            rdfp <- randDFP(nbins) 
-            if (model < priorsic[1] ) { 
-                # Serial OR
-                p <- runif(1) # proabability that channel 1 is first
-                priorarray[i,1,] <- p*rdfp$H1 + (1-p)*rdfp$H2
-                priorarray[i,2,] <- p*rdfp$H1 + (1-p)*rdfp$L2
-                priorarray[i,3,] <- p*rdfp$L1 + (1-p)*rdfp$H2
-                priorarray[i,4,] <- p*rdfp$L1 + (1-p)*rdfp$L2
-            } else if (model < priorsic[2]) { 
-                # Serial AND
-                priorarray[i,1,] <- rebin(dconvolve(rdfp$H1, rdfp$H2))
-                priorarray[i,2,] <- rebin(dconvolve(rdfp$H1, rdfp$L2))
-                priorarray[i,3,] <- rebin(dconvolve(rdfp$L1, rdfp$H2))
-                priorarray[i,4,] <- rebin(dconvolve(rdfp$L1, rdfp$L2))
-            } else if (model < priorsic[3]) { 
-                # Parallel OR
-                FH1 <- cumsum(rdfp$H1)
-                FL1 <- cumsum(rdfp$L1)
-                FH2 <- cumsum(rdfp$H2)
-                FL2 <- cumsum(rdfp$L2)
-                priorarray[i,1,] <- makePDF(rdfp$H1*(1-FH2) + (1-FH1)*rdfp$H2 + rdfp$H1*rdfp$H2)
-                priorarray[i,2,] <- makePDF(rdfp$H1*(1-FL2) + (1-FH1)*rdfp$L2 + rdfp$H1*rdfp$L2)
-                priorarray[i,3,] <- makePDF(rdfp$L1*(1-FH2) + (1-FL1)*rdfp$H2 + rdfp$L1*rdfp$H2)
-                priorarray[i,4,] <- makePDF(rdfp$L1*(1-FL2) + (1-FL1)*rdfp$L2 + rdfp$L1*rdfp$L2)
-            } else if (model < priorsic[4]) { 
-                # Parallel AND
-                FH1 <- cumsum(rdfp$H1)
-                FL1 <- cumsum(rdfp$L1)
-                FH2 <- cumsum(rdfp$H2)
-                FL2 <- cumsum(rdfp$L2)
-                priorarray[i,1,] <- rdfp$H1*FH2 + FH1*rdfp$H2 - rdfp$H1*rdfp$H2
-                priorarray[i,2,] <- rdfp$H1*FL2 + FH1*rdfp$L2 - rdfp$H1*rdfp$L2
-                priorarray[i,3,] <- rdfp$L1*FH2 + FL1*rdfp$H2 - rdfp$L1*rdfp$H2
-                priorarray[i,4,] <- rdfp$L1*FL2 + FL1*rdfp$L2 - rdfp$L1*rdfp$L2
-            }
-        }
-    }
-    return(priorarray)
-}
-
-
-
-samplePostSIC <- function(ns, binn, priorp, priorinfluence) {
-# Samples from the posterior distributions for HH, HL, LH, LL 
-#  ns:      number of samples to generate
-#  binn:    counts in each bin in the data
-#  priorp:  samples from the prior distribution
-#  priorinfluence:  weight of the prior distribution
-    dimprior <- dim(priorp)
-    ns <- dimprior[1]
-    out <- array(NA, dimprior)
-    priorparr <- priorinfluence*priorp + aperm(array(rep(c(binn[,'HH'], binn[,'HL'], binn[,'LH'], binn[,'LL']),ns), c(dimprior[3], 4,ns)))
-    for ( i in 1:ns ) {
-        for ( j in 1:4) {
-            out[i, j, ] <- rdirichlet(1, priorparr[i,j,])
-        }
-    }
-    return( out )
-}
-
-
-dconvolve <- function(x,y) {
-#  Function to compute a discrete convolution
-    n <- length(x)+ length(y) -1
-    if (length(x) < n ) x <- c(x, rep(0, n-length(x)))
-    if (length(y) < n ) y <- c(y, rep(0, n-length(y)))
-
-    out <- rep(0,n) 
-    for( i in 1:n ) {
-        out[i] =  sum(x[1:i] * y[i:1])
-    }
-    return(out)
-}
-
-
-makePDF <- function(x) {
-# Remove small values from the bins and re-normalize
-    x[ x < 1E-10 ] <- 0
-    x / sum(x)
-}
-
-
-rebin <- function(x) {
-    even <- 2*(1:(floor(length(x)/2)))
-    c(x[1], x[even]+x[even+1])
 }
 
 samplePriorPDF <- function(ns, alpha) {

@@ -68,78 +68,96 @@ transformed parameters {
    vector<lower=0>[nSubjects] shapeLL_0;
                                          
    // FOR GAMMA PRIOR
-   //mic <- 200 * p_mic;
-   //A <- -200 * p_A;
-   //B <- 200 * p_B;
-   //C <- 400 * p_C;
+   //mic = 200 * p_mic;
+   //A = -200 * p_A;
+   //B = 200 * p_B;
+   //C = 400 * p_C;
 
    // FOR NORMAL PRIOR
-   mic <-  100 + 50 * p_mic;
-   A   <- -100 + 50 * p_A;
-   B   <-  100 + 50 * p_B;
-   C   <-  400 + 100 * p_C;
+   mic =  100 + 50 * p_mic;
+   A   = -100 + 50 * p_A;
+   B   =  100 + 50 * p_B;
+   C   =  400 + 100 * p_C;
 
+   muHH_pos =  .25 * mic + .5 * A - .5 * B + .5 * C;
+   muHL_pos = -.25 * mic - .5 * A - .5 * B + .5 * C;
+   muLH_pos = -.25 * mic + .5 * A + .5 * B + .5 * C;
+   muLL_pos =  .25 * mic - .5 * A + .5 * B + .5 * C;
 
+   muHH_neg = -.25 * mic + .5 * A - .5 * B + .5 * C;
+   muHL_neg =  .25 * mic - .5 * A - .5 * B + .5 * C;
+   muLH_neg =  .25 * mic + .5 * A + .5 * B + .5 * C;
+   muLL_neg = -.25 * mic - .5 * A + .5 * B + .5 * C;
 
-   muHH_pos <-  .25 * mic + .5 * A - .5 * B + .5 * C;
-   muHL_pos <- -.25 * mic - .5 * A - .5 * B + .5 * C;
-   muLH_pos <- -.25 * mic + .5 * A + .5 * B + .5 * C;
-   muLL_pos <-  .25 * mic - .5 * A + .5 * B + .5 * C;
+   muHH_0   =            + .5 * A - .5 * B + .5 * C;
+   muHL_0   =            - .5 * A - .5 * B + .5 * C;
+   muLH_0   =            + .5 * A + .5 * B + .5 * C;
+   muLL_0   =            - .5 * A + .5 * B + .5 * C;
 
-   muHH_neg <- -.25 * mic + .5 * A - .5 * B + .5 * C;
-   muHL_neg <-  .25 * mic - .5 * A - .5 * B + .5 * C;
-   muLH_neg <-  .25 * mic + .5 * A + .5 * B + .5 * C;
-   muLL_neg <- -.25 * mic - .5 * A + .5 * B + .5 * C;
+   shapeHH_pos = muHH_pos .* rateHH;
+   shapeHL_pos = muHL_pos .* rateHL;
+   shapeLH_pos = muLH_pos .* rateLH;
+   shapeLL_pos = muLL_pos .* rateLL;
 
-   muHH_0   <-                + .5 * A - .5 * B + .5 * C;
-   muHL_0   <-                - .5 * A - .5 * B + .5 * C;
-   muLH_0   <-                + .5 * A + .5 * B + .5 * C;
-   muLL_0   <-                - .5 * A + .5 * B + .5 * C;
+   shapeHH_neg = muHH_neg .* rateHH;
+   shapeHL_neg = muHL_neg .* rateHL;
+   shapeLH_neg = muLH_neg .* rateLH;
+   shapeLL_neg = muLL_neg .* rateLL;
 
-   shapeHH_pos <- muHH_pos .* rateHH;
-   shapeHL_pos <- muHL_pos .* rateHL;
-   shapeLH_pos <- muLH_pos .* rateLH;
-   shapeLL_pos <- muLL_pos .* rateLL;
-
-   shapeHH_neg <- muHH_neg .* rateHH;
-   shapeHL_neg <- muHL_neg .* rateHL;
-   shapeLH_neg <- muLH_neg .* rateLH;
-   shapeLL_neg <- muLL_neg .* rateLL;
-
-   shapeHH_0 <- muHH_0 .* rateHH;
-   shapeHL_0 <- muHL_0 .* rateHL;
-   shapeLH_0 <- muLH_0 .* rateLH;
-   shapeLL_0 <- muLL_0 .* rateLL;
+   shapeHH_0 = muHH_0 .* rateHH;
+   shapeHL_0 = muHL_0 .* rateHL;
+   shapeLH_0 = muLH_0 .* rateLH;
+   shapeLL_0 = muLL_0 .* rateLL;
 }
 model {
    real logpr[3];
    for ( tr in 1:nHH) {
-      //increment_log_prob( gamma_log(rtHH[tr], shapeHH_0[subjectHH[tr]], rateHH[subjectHH[tr]]) );
-      logpr[1] <- log(modelProb_subj[subjectHH[tr], 1]) + gamma_log(rtHH[tr], shapeHH_pos[subjectHH[tr]], rateHH[subjectHH[tr]] );
-      logpr[2] <- log(modelProb_subj[subjectHH[tr], 3]) + gamma_log(rtHH[tr], shapeHH_neg[subjectHH[tr]], rateHH[subjectHH[tr]] );
-      logpr[3] <- log(modelProb_subj[subjectHH[tr], 2]) + gamma_log(rtHH[tr], shapeHH_0[subjectHH[tr]],   rateHH[subjectHH[tr]] );
-      increment_log_prob( log_sum_exp(logpr) ) ;
+      logpr[1] = log(modelProb_subj[subjectHH[tr], 1]) 
+                 + gamma_lpmf(rtHH[tr], shapeHH_pos[subjectHH[tr]], 
+                              rateHH[subjectHH[tr]]);
+      logpr[2] = log(modelProb_subj[subjectHH[tr], 3]) 
+                 + gamma_lpmf(rtHH[tr], shapeHH_neg[subjectHH[tr]], 
+                              rateHH[subjectHH[tr]]);
+      logpr[3] = log(modelProb_subj[subjectHH[tr], 2]) 
+                 + gamma_lpmf(rtHH[tr], shapeHH_0[subjectHH[tr]],
+                              rateHH[subjectHH[tr]]);
+      target += log_sum_exp(logpr);
    }
    for ( tr in 1:nHL) {
-      //increment_log_prob( gamma_log(rtHL[tr], shapeHL_0[subjectHL[tr]], rateHL[subjectHL[tr]]) ) ;
-      logpr[1] <- log(modelProb_subj[subjectHL[tr], 1]) + gamma_log(rtHL[tr], shapeHL_pos[subjectHL[tr]], rateHL[subjectHL[tr]]);
-      logpr[2] <- log(modelProb_subj[subjectHL[tr], 3]) + gamma_log(rtHL[tr], shapeHL_neg[subjectHL[tr]], rateHL[subjectHL[tr]]);
-      logpr[3] <- log(modelProb_subj[subjectHL[tr], 2]) + gamma_log(rtHL[tr], shapeHL_0[subjectHL[tr]],   rateHL[subjectHL[tr]]);
-      increment_log_prob( log_sum_exp(logpr) ) ;
+      logpr[1] = log(modelProb_subj[subjectHL[tr], 1]) 
+                 + gamma_lpmf(rtHL[tr], shapeHL_pos[subjectHL[tr]], 
+                              rateHL[subjectHL[tr]]);
+      logpr[2] = log(modelProb_subj[subjectHL[tr], 3]) 
+                 + gamma_lpmf(rtHL[tr], shapeHL_neg[subjectHL[tr]], 
+                              rateHL[subjectHL[tr]]);
+      logpr[3] = log(modelProb_subj[subjectHL[tr], 2]) 
+                 + gamma_lpmf(rtHL[tr], shapeHL_0[subjectHL[tr]],   
+                              rateHL[subjectHL[tr]]);
+      target += log_sum_exp(logpr);
    }
    for ( tr in 1:nLH) {
-      //increment_log_prob( gamma_log(rtLH[tr], shapeLH_0[subjectLH[tr]], rateLH[subjectLH[tr]]) ) ;
-      logpr[1] <- log(modelProb_subj[subjectLH[tr], 1]) + gamma_log(rtLH[tr], shapeLH_pos[subjectLH[tr]], rateLH[subjectLH[tr]]);
-      logpr[2] <- log(modelProb_subj[subjectLH[tr], 3]) + gamma_log(rtLH[tr], shapeLH_neg[subjectLH[tr]], rateLH[subjectLH[tr]]);
-      logpr[3] <- log(modelProb_subj[subjectLH[tr], 2]) + gamma_log(rtLH[tr], shapeLH_0[subjectLH[tr]],   rateLH[subjectLH[tr]]);
-      increment_log_prob( log_sum_exp(logpr) ) ;
+      logpr[1] = log(modelProb_subj[subjectLH[tr], 1]) 
+                 + gamma_lpmf(rtLH[tr], shapeLH_pos[subjectLH[tr]], 
+                              rateLH[subjectLH[tr]]);
+      logpr[2] = log(modelProb_subj[subjectLH[tr], 3]) 
+                 + gamma_lpmf(rtLH[tr], shapeLH_neg[subjectLH[tr]], 
+                              rateLH[subjectLH[tr]]);
+      logpr[3] = log(modelProb_subj[subjectLH[tr], 2]) 
+                 + gamma_lpmf(rtLH[tr], shapeLH_0[subjectLH[tr]],   
+                              rateLH[subjectLH[tr]]);
+      target += log_sum_exp(logpr);
    }
    for ( tr in 1:nLL) {
-      //increment_log_prob( gamma_log(rtLL[tr], shapeLL_0[subjectLL[tr]], rateLL[subjectLL[tr]]) ) ;
-      logpr[1] <- log(modelProb_subj[subjectLL[tr], 1]) + gamma_log(rtLL[tr], shapeLL_pos[subjectLL[tr]], rateLL[subjectLL[tr]]);
-      logpr[2] <- log(modelProb_subj[subjectLL[tr], 3]) + gamma_log(rtLL[tr], shapeLL_neg[subjectLL[tr]], rateLL[subjectLL[tr]]);
-      logpr[3] <- log(modelProb_subj[subjectLL[tr], 2]) + gamma_log(rtLL[tr], shapeLL_0[subjectLL[tr]],   rateLL[subjectLL[tr]]);
-      increment_log_prob( log_sum_exp(logpr) ) ;
+      logpr[1] = log(modelProb_subj[subjectLL[tr], 1]) 
+                 + gamma_lpmf(rtLL[tr], shapeLL_pos[subjectLL[tr]], 
+                              rateLL[subjectLL[tr]]);
+      logpr[2] = log(modelProb_subj[subjectLL[tr], 3]) 
+                 + gamma_lpmf(rtLL[tr], shapeLL_neg[subjectLL[tr]], 
+                              rateLL[subjectLL[tr]]);
+      logpr[3] = log(modelProb_subj[subjectLL[tr], 2]) 
+                 + gamma_lpmf(rtLL[tr], shapeLL_0[subjectLL[tr]],   
+                              rateLL[subjectLL[tr]]);
+      target += log_sum_exp(logpr);
    }
 
    //p_mic ~ gamma(2,4);
