@@ -29,8 +29,10 @@ sicGroupBF <- function(inData, sictest="bf", domtest="ks", plotSIC=TRUE, ...) {
   } else if(sictest=="bf") {
     BF <- numeric()
     BFwin <- numeric() 
+    # "Z" "N" "P" "nP" "Np" "np"
     BFnames <- c("SerialOR", "ParallelAND", "ParallelOR", "Coactive",
                  "ParallelAND", "SerialAND")
+    #BFnames <- c("SerialOR", "SerialAND", "ParallelOR", "ParallelAND", "Coactive")
   } else {
     cat("Only KS-SIC test is currently implemented.\n")
     return(NA)
@@ -87,10 +89,12 @@ sicGroupBF <- function(inData, sictest="bf", domtest="ks", plotSIC=TRUE, ...) {
             }
           }
         } else if(sictest=="bf") {
-          dat <- list(HH, HL, LH, LL) 
-          BF <- rbind(BF, BFsic(dat,maxn=2e4,priorinfluence=1,verbose=FALSE,
-                          tolSIC=.1,tolMIC=.3,fasttest2=T)$BF)
-          BFwin <- c(BFwin, BFnames[BF[n,] == max(BF[n,])])
+          BFx <- sictestBayes(HH, HL, LH, LL, method="DP")$statistic
+          #dat <- list(HH, HL, LH, LL) 
+          #BF <- rbind(BF, BFsic(dat,maxn=2e4,priorinfluence=1,verbose=FALSE,
+          #                tolSIC=.1,tolMIC=.3,fasttest2=T)$BF)
+          BF <- rbind(BF, BFx)
+          BFwin <- c(BFwin, BFnames[BFx == max(BFx)])
 
         }
         if(plotSIC) {
@@ -208,7 +212,7 @@ waic <- function (log_lik){
 sicDPtest <- function(dat) { 
   RTall <- unlist(dat)
    
-  nbin <- min(100, min(unlist(lapply(dat,length)))-1)
+  nbin <- min(100, .5*min(unlist(lapply(dat,length)))-1)
   nsamp <- 1e4
 
   prec<-.01
@@ -218,8 +222,8 @@ sicDPtest <- function(dat) {
   sig<-.95
   fasttest2<-F
   maxn<-5e5
-  tolSIC<-2e-3
-  tolMIC<-1e0
+  tolSIC <- 5e-2
+  tolMIC <- mean(RTall) / 700
   verbose<-F
 
   # Define Bins
@@ -369,8 +373,8 @@ checkmods <- function(x,dx,tolSIC=5e-2,tolMIC=1e-2) {
   if (sum(d)>1) return( c(FALSE,FALSE,FALSE,FALSE,FALSE,FALSE) )
 
   # Calculate MIC
-  sumN <- -sum(x[neg]*dx[neg])
-  sumP <- sum(x[!neg]*dx[!neg])
+  sumN <- -sum(x[x<0]*dx[x<0])
+  sumP <- sum(x[x>0]*dx[x>0])
 
   # Check if the MIC is zero
   if(abs(sumN-sumP)<tolMIC) return( c(FALSE,FALSE,FALSE,FALSE,FALSE,TRUE) )

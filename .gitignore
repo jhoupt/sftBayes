@@ -1,0 +1,6 @@
+
+*.history
+parametricMIC/tmp.txt
+*.rds
+parametricMIC/micmodel_basetime.hpp
+parametricMIC/micmodel_basetime
