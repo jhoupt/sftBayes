@@ -28,7 +28,7 @@ micmodel_inits <- function(stanData, DUMP=FALSE) {
    while (! good) {
       good <- TRUE
       p_mic <- abs(rnorm(nSubjects,0,1))
-      mic <- 100 + 50 * p_mic
+      mic_magnitude <- 100 + 50 * p_mic
 
       p_A <- (A + 100) / 50 
       p_B <- (B - 100) / 50 
@@ -39,15 +39,15 @@ micmodel_inits <- function(stanData, DUMP=FALSE) {
       rateLH <- rgamma(nSubjects,1,1);
       rateLL <- rgamma(nSubjects,1,1);
 
-      muHH_pos <-  .25 * mic + .5 * A - .5 * B + .5 * C
-      muHL_pos <- -.25 * mic - .5 * A - .5 * B + .5 * C
-      muLH_pos <- -.25 * mic + .5 * A + .5 * B + .5 * C
-      muLL_pos <-  .25 * mic - .5 * A + .5 * B + .5 * C
-                                                       
-      muHH_neg <- -.25 * mic + .5 * A - .5 * B + .5 * C
-      muHL_neg <-  .25 * mic - .5 * A - .5 * B + .5 * C
-      muLH_neg <-  .25 * mic + .5 * A + .5 * B + .5 * C
-      muLL_neg <- -.25 * mic - .5 * A + .5 * B + .5 * C
+      muHH_pos <-  .25 * mic_magnitude + .5 * A - .5 * B + .5 * C
+      muHL_pos <- -.25 * mic_magnitude - .5 * A - .5 * B + .5 * C
+      muLH_pos <- -.25 * mic_magnitude + .5 * A + .5 * B + .5 * C
+      muLL_pos <-  .25 * mic_magnitude - .5 * A + .5 * B + .5 * C
+
+      muHH_neg <- -.25 * mic_magnitude + .5 * A - .5 * B + .5 * C
+      muHL_neg <-  .25 * mic_magnitude - .5 * A - .5 * B + .5 * C
+      muLH_neg <-  .25 * mic_magnitude + .5 * A + .5 * B + .5 * C
+      muLL_neg <- -.25 * mic_magnitude - .5 * A + .5 * B + .5 * C
                                                                                                  
       muHH_0   <-            + .5 * A - .5 * B + .5 * C
       muHL_0   <-            - .5 * A - .5 * B + .5 * C
@@ -113,27 +113,29 @@ mic_shiftedwald_inits <- function(stanData, DUMP=FALSE) {
    good <- FALSE
    while (! good) {
       good <- TRUE
-      p_mic <- abs(rnorm(nSubjects,0,1))
-      mic <- 100 + 50 * p_mic
+      p_mic_pos <- abs(rnorm(nSubjects,0,1))
+      p_mic_neg <- abs(rnorm(nSubjects,0,1))
+      mic_magnitude_pos <- 100 + 50 * p_mic_pos
+      mic_magnitude_neg <- 100 + 50 * p_mic_neg
 
       p_A <- (A + 100) / 50 
       p_B <- (B - 100) / 50 
-      p_C <- (C - 400) / 100 
+      p_C <- (C - 1000) / 100 
 
       gammaHH <- rgamma(nSubjects,1,1);
       gammaHL <- rgamma(nSubjects,1,1);
       gammaLH <- rgamma(nSubjects,1,1);
       gammaLL <- rgamma(nSubjects,1,1);
 
-      muHH_pos <-  .25 * mic + .5 * A - .5 * B + .5 * C
-      muHL_pos <- -.25 * mic - .5 * A - .5 * B + .5 * C
-      muLH_pos <- -.25 * mic + .5 * A + .5 * B + .5 * C
-      muLL_pos <-  .25 * mic - .5 * A + .5 * B + .5 * C
+      muHH_pos <-  .25 * mic_magnitude_pos + .5 * A - .5 * B + .5 * C
+      muHL_pos <- -.25 * mic_magnitude_pos - .5 * A - .5 * B + .5 * C
+      muLH_pos <- -.25 * mic_magnitude_pos + .5 * A + .5 * B + .5 * C
+      muLL_pos <-  .25 * mic_magnitude_pos - .5 * A + .5 * B + .5 * C
                                                        
-      muHH_neg <- -.25 * mic + .5 * A - .5 * B + .5 * C
-      muHL_neg <-  .25 * mic - .5 * A - .5 * B + .5 * C
-      muLH_neg <-  .25 * mic + .5 * A + .5 * B + .5 * C
-      muLL_neg <- -.25 * mic - .5 * A + .5 * B + .5 * C
+      muHH_neg <- -.25 * mic_magnitude_neg + .5 * A - .5 * B + .5 * C
+      muHL_neg <-  .25 * mic_magnitude_neg - .5 * A - .5 * B + .5 * C
+      muLH_neg <-  .25 * mic_magnitude_neg + .5 * A + .5 * B + .5 * C
+      muLL_neg <- -.25 * mic_magnitude_neg - .5 * A + .5 * B + .5 * C
                                                                                                  
       muHH_0   <-            + .5 * A - .5 * B + .5 * C
       muHL_0   <-            - .5 * A - .5 * B + .5 * C
@@ -153,12 +155,16 @@ mic_shiftedwald_inits <- function(stanData, DUMP=FALSE) {
    } 
 
    if (DUMP) {
-      stan_rdump(c("p_mic", "p_A", "p_B", "p_C", "gammaHH", "gammaHL", "gammaLH", "gammaLL",  "modelProb_group", "modelProb_subj"), file="sftStanInits.Rdmp")
+      stan_rdump(c("p_mic_pos", "p_mic_neg", "p_A", "p_B", "p_C", "gammaHH", "gammaHL", "gammaLH", "gammaLL",  "modelProb_group", "modelProb_subj"), file="sftStanInits.Rdmp")
    }
-   return(list(p_mic=p_mic, p_A=p_A, p_B=p_B, p_C=p_C,
+   return(list(p_mic_neg=p_mic_neg, p_mic_pos=p_mic_pos, p_A=p_A, p_B=p_B, p_C=p_C,
                theta=theta,
-               gammaHH=gammaHH, gammaHL=gammaHL, 
-               gammaLH=gammaLH, gammaLL=gammaLL, 
+               gammaHH_pos=gammaHH, gammaHL_pos=gammaHL, 
+               gammaLH_pos=gammaLH, gammaLL_pos=gammaLL, 
+               gammaHH_neg=gammaHH, gammaHL_neg=gammaHL, 
+               gammaLH_neg=gammaLH, gammaLL_neg=gammaLL, 
+               gammaHH_0=gammaHH, gammaHL_0=gammaHL, 
+               gammaLH_0=gammaLH, gammaLL_0=gammaLL, 
                modelProb_group=modelProb_group,
                modelProb_subj=modelProb_subj))
 }

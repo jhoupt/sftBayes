@@ -28,8 +28,7 @@ parameters {
   simplex[3] modelProb_group;
   simplex[3] modelProb_subj[nSubjects];
 
-  vector[nSubjects] p_mic_neg;
-  vector[nSubjects] p_mic_pos;
+  vector[nSubjects] p_mic;
 
   vector[nSubjects] p_A;
   vector[nSubjects] p_B;
@@ -43,12 +42,40 @@ parameters {
   vector<lower=0,upper=500>[nSubjects] theta;
 }
 transformed parameters { 
-  vector<lower=0>[nSubjects] mic_magnitude_pos;
-  vector<lower=0>[nSubjects] mic_magnitude_neg;
+  vector<lower=0>[nSubjects] mic_magnitude;
   vector<upper=0>[nSubjects] A;
   vector<lower=0>[nSubjects] B;
   vector<lower=0>[nSubjects] C;
 
+  vector<lower=0>[nSubjects] muHH_pos;
+  vector<lower=0>[nSubjects] muHL_pos;
+  vector<lower=0>[nSubjects] muLH_pos;
+  vector<lower=0>[nSubjects] muLL_pos;
+
+  vector<lower=0>[nSubjects] muHH_neg;
+  vector<lower=0>[nSubjects] muHL_neg;
+  vector<lower=0>[nSubjects] muLH_neg;
+  vector<lower=0>[nSubjects] muLL_neg;
+
+  vector<lower=0>[nSubjects] muHH_0;
+  vector<lower=0>[nSubjects] muHL_0;
+  vector<lower=0>[nSubjects] muLH_0;
+  vector<lower=0>[nSubjects] muLL_0;
+
+  vector<lower=0>[nSubjects] alphaHH_pos;
+  vector<lower=0>[nSubjects] alphaHL_pos;
+  vector<lower=0>[nSubjects] alphaLH_pos;
+  vector<lower=0>[nSubjects] alphaLL_pos;
+
+  vector<lower=0>[nSubjects] alphaHH_neg;
+  vector<lower=0>[nSubjects] alphaHL_neg;
+  vector<lower=0>[nSubjects] alphaLH_neg;
+  vector<lower=0>[nSubjects] alphaLL_neg;
+  
+  vector<lower=0>[nSubjects] alphaHH_0;
+  vector<lower=0>[nSubjects] alphaHL_0;
+  vector<lower=0>[nSubjects] alphaLH_0;
+  vector<lower=0>[nSubjects] alphaLL_0;
                                         
   // FOR GAMMA PRIOR
   //mic_magnitude = 200 * p_mic;
@@ -57,55 +84,20 @@ transformed parameters {
   //C = 400 * p_C;
 
   // FOR NORMAL PRIOR
-  mic_magnitude_pos =  100 + 50 * p_mic_pos;
-  mic_magnitude_neg =  100 + 50 * p_mic_neg;
+  mic_magnitude =  100 + 50 * p_mic;
   A   = -100 + 50 * p_A;
   B   =  100 + 50 * p_B;
-  C   =  1000 + 100 * p_C;
+  C   =  400 + 100 * p_C;
 
-}
-model {
-  real logpr[3];
+  muHH_pos =  .25 * mic_magnitude + .5 * A - .5 * B + .5 * C;
+  muHL_pos = -.25 * mic_magnitude - .5 * A - .5 * B + .5 * C;
+  muLH_pos = -.25 * mic_magnitude + .5 * A + .5 * B + .5 * C;
+  muLL_pos =  .25 * mic_magnitude - .5 * A + .5 * B + .5 * C;
 
-  vector[nSubjects] muHH_pos;
-  vector[nSubjects] muHL_pos;
-  vector[nSubjects] muLH_pos;
-  vector[nSubjects] muLL_pos;
-
-  vector[nSubjects] muHH_neg;
-  vector[nSubjects] muHL_neg;
-  vector[nSubjects] muLH_neg;
-  vector[nSubjects] muLL_neg;
-
-  vector[nSubjects] muHH_0;
-  vector[nSubjects] muHL_0;
-  vector[nSubjects] muLH_0;
-  vector[nSubjects] muLL_0;
-
-  vector[nSubjects] alphaHH_pos;
-  vector[nSubjects] alphaHL_pos;
-  vector[nSubjects] alphaLH_pos;
-  vector[nSubjects] alphaLL_pos;
-
-  vector[nSubjects] alphaHH_neg;
-  vector[nSubjects] alphaHL_neg;
-  vector[nSubjects] alphaLH_neg;
-  vector[nSubjects] alphaLL_neg;
-  
-  vector[nSubjects] alphaHH_0;
-  vector[nSubjects] alphaHL_0;
-  vector[nSubjects] alphaLH_0;
-  vector[nSubjects] alphaLL_0;
-
-  muHH_pos =  .25 * mic_magnitude_pos + .5 * A - .5 * B + .5 * C;
-  muHL_pos = -.25 * mic_magnitude_pos - .5 * A - .5 * B + .5 * C;
-  muLH_pos = -.25 * mic_magnitude_pos + .5 * A + .5 * B + .5 * C;
-  muLL_pos =  .25 * mic_magnitude_pos - .5 * A + .5 * B + .5 * C;
-
-  muHH_neg = -.25 * mic_magnitude_neg + .5 * A - .5 * B + .5 * C;
-  muHL_neg =  .25 * mic_magnitude_neg - .5 * A - .5 * B + .5 * C;
-  muLH_neg =  .25 * mic_magnitude_neg + .5 * A + .5 * B + .5 * C;
-  muLL_neg = -.25 * mic_magnitude_neg - .5 * A + .5 * B + .5 * C;
+  muHH_neg = -.25 * mic_magnitude + .5 * A - .5 * B + .5 * C;
+  muHL_neg =  .25 * mic_magnitude - .5 * A - .5 * B + .5 * C;
+  muLH_neg =  .25 * mic_magnitude + .5 * A + .5 * B + .5 * C;
+  muLL_neg = -.25 * mic_magnitude - .5 * A + .5 * B + .5 * C;
 
   muHH_0   =            + .5 * A - .5 * B + .5 * C;
   muHL_0   =            - .5 * A - .5 * B + .5 * C;
@@ -126,12 +118,13 @@ model {
   alphaHL_0 = muHL_0 .* gammaHL;
   alphaLH_0 = muLH_0 .* gammaLH;
   alphaLL_0 = muLL_0 .* gammaLL;
-
-
-
-
-
+}
+model {
+  real logpr[3];
   for ( tr in 1:nHH) {
+     //target += shifted_wald_lpdf(rtHH[tr] | gammaHH[subjectHH[tr]],
+     //                                       alphaHH[subjectHH[tr]],
+     //                                       theta[subjectHH[tr]]);
      logpr[1] = log(modelProb_subj[subjectHH[tr], 1]) 
                 + shifted_wald_lpdf(rtHH[tr] | gammaHH[subjectHH[tr]],
                                                alphaHH_pos[subjectHH[tr]],
@@ -147,6 +140,9 @@ model {
      target += log_sum_exp(logpr);
   }
   for ( tr in 1:nHL) {
+     //target += shifted_wald_lpdf(rtHL[tr] | gammaHL[subjectHL[tr]],
+     //                                       alphaHL[subjectHL[tr]],
+     //                                       theta[subjectHL[tr]]);
      logpr[1] = log(modelProb_subj[subjectHL[tr], 1]) 
                 + shifted_wald_lpdf(rtHL[tr] | gammaHL[subjectHL[tr]], 
                                                alphaHL_pos[subjectHL[tr]],
@@ -162,6 +158,9 @@ model {
      target += log_sum_exp(logpr);
   }
   for ( tr in 1:nLH) {
+     //target += shifted_wald_lpdf(rtLH[tr] | gammaLH[subjectLH[tr]],
+     //                                       alphaLH[subjectLH[tr]],
+     //                                       theta[subjectLH[tr]]);
      logpr[1] = log(modelProb_subj[subjectLH[tr], 1]) 
                 + shifted_wald_lpdf(rtLH[tr] | gammaLH[subjectLH[tr]], 
                                                alphaLH_pos[subjectLH[tr]],
@@ -177,6 +176,9 @@ model {
      target += log_sum_exp(logpr);
   }
   for ( tr in 1:nLL) {
+     //target += shifted_wald_lpdf(rtLL[tr] | gammaLL[subjectLL[tr]],
+     //                                       alphaLL[subjectLL[tr]],
+     //                                       theta[subjectLL[tr]]);
      logpr[1] = log(modelProb_subj[subjectLL[tr], 1]) 
                 + shifted_wald_lpdf(rtLL[tr] | gammaLL[subjectLL[tr]], 
                                                alphaLL_pos[subjectLL[tr]],
@@ -197,8 +199,7 @@ model {
   //p_B ~ gamma(2,4);
   //p_C ~ gamma(2,4);
 
-  p_mic_neg ~ normal(0,1);
-  p_mic_pos ~ normal(0,1);
+  p_mic ~ normal(0,1);
   p_A ~ normal(0,1);
   p_B ~ normal(0,1);
   p_C ~ normal(0,1);
@@ -213,5 +214,4 @@ model {
      modelProb_subj[sj] ~ dirichlet(modelProb_group);
   }
 }
-
 

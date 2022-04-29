@@ -29,10 +29,8 @@ sicGroupBF <- function(inData, sictest="bf", domtest="ks", plotSIC=TRUE, ...) {
   } else if(sictest=="bf") {
     BF <- numeric()
     BFwin <- numeric() 
-    # "Z" "N" "P" "nP" "Np" "np"
-    BFnames <- c("SerialOR", "ParallelAND", "ParallelOR", "Coactive",
-                 "ParallelAND", "SerialAND")
-    #BFnames <- c("SerialOR", "SerialAND", "ParallelOR", "ParallelAND", "Coactive")
+    #BFnames <- c("SerialOR", "ParallelAND", "ParallelOR", "Coactive",
+    #             "ParallelAND", "SerialAND")
   } else {
     cat("Only KS-SIC test is currently implemented.\n")
     return(NA)
@@ -94,7 +92,14 @@ sicGroupBF <- function(inData, sictest="bf", domtest="ks", plotSIC=TRUE, ...) {
           #BF <- rbind(BF, BFsic(dat,maxn=2e4,priorinfluence=1,verbose=FALSE,
           #                tolSIC=.1,tolMIC=.3,fasttest2=T)$BF)
           BF <- rbind(BF, BFx)
-          BFwin <- c(BFwin, BFnames[BFx == max(BFx)])
+          BFwinx <- switch(names(BFx)[BFx == max(BFx)],
+            Zero = "SerialOR",
+            Negative = "ParallelAND",
+            Positive = "ParallelOR",
+            NegPos.MIC0 = "SerialAND",
+            NegPos.MICpos = "Coactive")
+
+          BFwin <- c(BFwin, BFwinx)
 
         }
         if(plotSIC) {
@@ -137,9 +142,13 @@ sictestBayes <- function(HH, HL, LH, LL, method=c("DP", "IG"), model=NULL) {
   if ( method == "DP") { 
     METHOD <- "Nonparametric Bayesian SIC test"
     statistic <- sicDPtest(list(HH, HL, LH, LL))$BF
+    names(statistic)[names(statistic)=="Z"] <- "Zero"
+    names(statistic)[names(statistic)=="N"] <- "Negative"
+    names(statistic)[names(statistic)=="P"] <- "Positive"
+    names(statistic)[names(statistic)=="np"] <- "NegPos.MIC0"
+    names(statistic)[names(statistic)=="nP"] <- "NegPos.MICpos"
+    names(statistic)[names(statistic)=="Np"] <- "NegPos.MICneg"
     statistic <- statistic[c(1,6,3,2,4)]
-    names(statistic) <- c("Zero", "NegPos.MIC0", "Positive", "Negative", "NegPos.MICpos")
-
   } else if ( method == "IG") { 
     METHOD <- "Parametric Bayesian SIC test"
 
@@ -251,7 +260,7 @@ sicDPtest <- function(dat) {
 
   repeat {
 
-    # Sample PDF from the prior and posterior
+    # Sample PDF from the encompassing prior and posterior
     priorp <- samplePriorPDF(nsamp, alpha)
     postp <- samplePostPDF(nsamp, binn, alpha)
 
@@ -260,22 +269,18 @@ sicDPtest <- function(dat) {
     postSIC  <- apply(postp,1,pdfs2SIC)
 
     # Count number of SIC types in prior and posterior
-    Npr <- apply(apply(priorSIC,2,checkmods,dx=dx,tolSIC=tolSIC,tolMIC=tolMIC),1,sum)
+    Npr <- apply(apply(priorSIC, 2, checkmods, dx=dx, tolSIC=tolSIC,
+                       tolMIC=tolMIC), 1, sum)
     Npo <- apply(apply(postSIC,2,checkmods,dx=dx,tolSIC=tolSIC,tolMIC=tolMIC),1,sum)
     Npos <- Npos+Npo; 
     Nprs <- Nprs+Npr
 
     N <- N+nsamp
 
-    # Samples from encompassing prior
-    encPrior <- array(as.vector(rdirichlet(4*nsamp,alpha)),dim=c(nsamp,4,length(alpha)))
-    encPriorSIC <- apply(encPrior,1,pdfs2SIC)
-    NencPr <- apply(apply(encPriorSIC,2,checkmods,dx=dx,tolSIC=tolSIC,tolMIC=tolMIC),1,sum)
-    NencPrs <- NencPrs + NencPr
 
     # Bayes factor relative to the encompassing prior
-    BF <- (Npos+1)/(NencPrs+1)
-    CIs <- cis(ci,Npos,NencPrs,N)
+    BF <- (Npos+1)/(Nprs+1)
+    CIs <- cis(ci,Npos,Nprs,N)
 
     dcis <- apply(CIs,1,diff)
 
@@ -298,7 +303,7 @@ sicDPtest <- function(dat) {
 
     if (converge | N>=maxn) break
   }
-  list(BF=BF,BFp=pmat,N=nmat,ci=ci)
+  return(list(BF=BF,BFp=pmat,N=nmat,ci=ci))
 }
 
 
